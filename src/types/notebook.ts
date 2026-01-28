@@ -2,6 +2,9 @@ export interface Task {
   id: string;
   text: string;
   completed: Record<number, boolean>; // pageNumber -> completed status
+  hasCounter?: boolean;
+  counterStart?: number;
+  counterIncrement?: number;
 }
 
 export interface SectionLayout {
@@ -18,12 +21,25 @@ export interface Section {
   layout: SectionLayout;
 }
 
+export interface ChallengeAttempt {
+  id: string;
+  startedAt: string;
+  endedAt?: string;
+  completedDays: number;
+  sections: Section[];
+}
+
 export interface NotebookData {
   title: string;
   sections: Section[];
   totalDays: number;
   startDate: string;
-  layouts: Record<string, SectionLayout[]>; // Store layouts per breakpoint if needed
+  layouts: Record<string, SectionLayout[]>;
+  currentAttempt: number;
+  attempts: ChallengeAttempt[];
+  reminderTime?: string; // HH:mm format
+  reminderEnabled?: boolean;
+  theme: 'light' | 'dark';
 }
 
 export type PageType = 'cover' | 'template' | 'day' | 'report';
