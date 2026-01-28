@@ -1,9 +1,15 @@
+import { useCallback } from 'react';
 import { useNotebook } from '@/hooks/useNotebook';
+import { useSwipeNavigation } from '@/hooks/useSwipeNavigation';
+import { useReminder } from '@/hooks/useReminder';
 import { CoverPage } from '@/components/notebook/CoverPage';
 import { TemplatePage } from '@/components/notebook/TemplatePage';
 import { DayPage } from '@/components/notebook/DayPage';
 import { ReportPage } from '@/components/notebook/ReportPage';
 import { PageNavigation } from '@/components/notebook/PageNavigation';
+import { ThemeToggle } from '@/components/notebook/ThemeToggle';
+import { ReminderSettings } from '@/components/notebook/ReminderSettings';
+import { ReminderBadge } from '@/components/notebook/ReminderBadge';
 
 const Index = () => {
   const {
@@ -26,9 +32,44 @@ const Index = () => {
     goToPage,
     nextPage,
     prevPage,
-    updateAllLayouts,
     getAnalytics,
+    setReminderEnabled,
+    setReminderTime,
+    checkForMissedDay,
+    resetChallenge,
+    getTaskValueForDay,
+    hasIncompleteTasksToday,
   } = useNotebook();
+
+  const { containerRef, swipeOffset, isSwiping } = useSwipeNavigation({
+    onSwipeLeft: nextPage,
+    onSwipeRight: prevPage,
+  });
+
+  const {
+    notificationPermission,
+    requestPermission,
+    showBadge,
+    dismissBadge,
+  } = useReminder({
+    enabled: data.reminderEnabled || false,
+    reminderTime: data.reminderTime,
+    hasIncompleteTasks: hasIncompleteTasksToday(),
+  });
+
+  const missedDay = checkForMissedDay();
+
+  const handleToggleReminder = useCallback(() => {
+    if (!data.reminderEnabled && notificationPermission !== 'granted') {
+      requestPermission().then(granted => {
+        if (granted) {
+          setReminderEnabled(true);
+        }
+      });
+    } else {
+      setReminderEnabled(!data.reminderEnabled);
+    }
+  }, [data.reminderEnabled, notificationPermission, requestPermission, setReminderEnabled]);
 
   const renderPage = () => {
     switch (currentPageInfo.type) {
@@ -39,9 +80,13 @@ const Index = () => {
             startDate={data.startDate}
             endDate={getEndDate()}
             totalDays={data.totalDays}
+            attempts={data.attempts}
+            currentAttempt={data.currentAttempt}
+            missedDay={missedDay}
             onUpdateTitle={setTitle}
             onUpdateStartDate={setStartDate}
             onUpdateTotalDays={setTotalDays}
+            onResetChallenge={resetChallenge}
           />
         );
       case 'template':
@@ -54,7 +99,6 @@ const Index = () => {
             onAddTask={addTask}
             onUpdateTaskText={updateTaskText}
             onDeleteTask={deleteTask}
-            onUpdateLayouts={updateAllLayouts}
           />
         );
       case 'day':
@@ -66,6 +110,7 @@ const Index = () => {
             onToggleTask={(sectionId, taskId) => 
               toggleTask(sectionId, taskId, currentPageInfo.dayNumber!)
             }
+            getTaskValueForDay={getTaskValueForDay}
           />
         );
       case 'report':
@@ -80,6 +125,25 @@ const Index = () => {
 
   return (
     <div className="min-h-screen bg-background py-8 px-4">
+      {/* Top Bar */}
+      <div className="max-w-2xl mx-auto mb-4 flex justify-end gap-2">
+        <ReminderSettings
+          enabled={data.reminderEnabled || false}
+          time={data.reminderTime}
+          notificationPermission={notificationPermission}
+          onToggle={handleToggleReminder}
+          onTimeChange={setReminderTime}
+          onRequestPermission={requestPermission}
+        />
+        <ReminderBadge
+          showBadge={showBadge}
+          onDismiss={dismissBadge}
+          reminderEnabled={data.reminderEnabled || false}
+          onToggleReminder={handleToggleReminder}
+        />
+        <ThemeToggle />
+      </div>
+
       {/* Navigation */}
       <PageNavigation
         currentPageIndex={currentPageIndex}
@@ -91,8 +155,14 @@ const Index = () => {
         onGoToPage={goToPage}
       />
 
-      {/* Page Content */}
-      <main className="max-w-2xl mx-auto">
+      {/* Page Content with Swipe */}
+      <main 
+        ref={containerRef}
+        className="max-w-2xl mx-auto transition-transform"
+        style={{
+          transform: isSwiping ? `translateX(${swipeOffset}px)` : 'translateX(0)',
+        }}
+      >
         {renderPage()}
       </main>
 

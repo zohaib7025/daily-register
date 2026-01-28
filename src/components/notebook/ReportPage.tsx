@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, BarChart, Bar } from 'recharts';
 import { Trophy, Flame, Target, TrendingUp } from 'lucide-react';
 
@@ -19,14 +20,14 @@ interface ReportPageProps {
 
 const COLORS = ['hsl(var(--primary))', 'hsl(var(--accent))', 'hsl(142, 76%, 36%)', 'hsl(38, 92%, 50%)', 'hsl(280, 65%, 60%)'];
 
-export const ReportPage = ({ analytics, totalDays }: ReportPageProps) => {
+export const ReportPage = forwardRef<HTMLDivElement, ReportPageProps>(({ analytics, totalDays }, ref) => {
   const pieData = analytics.sectionBreakdown.map(s => ({
     name: s.name,
     value: s.completed,
   }));
 
   return (
-    <div className="notebook-page page-curl min-h-[600px] rounded-sm overflow-hidden animate-fade-in">
+    <div ref={ref} className="notebook-page page-curl min-h-[600px] rounded-sm overflow-hidden animate-fade-in">
       {/* Header */}
       <div className="flex justify-between items-start pt-4 px-4 mb-4">
         <div className="pl-10">
@@ -189,4 +190,6 @@ export const ReportPage = ({ analytics, totalDays }: ReportPageProps) => {
       </div>
     </div>
   );
-};
+});
+
+ReportPage.displayName = 'ReportPage';

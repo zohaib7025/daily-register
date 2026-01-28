@@ -1,26 +1,36 @@
-import { useState } from 'react';
+import { forwardRef, useState } from 'react';
 import { format } from 'date-fns';
-import { BookOpen, Pencil, Calendar } from 'lucide-react';
+import { BookOpen, Pencil, Calendar, RefreshCw } from 'lucide-react';
+import { AttemptHistory } from './AttemptHistory';
+import { ChallengeAttempt } from '@/types/notebook';
 
 interface CoverPageProps {
   title: string;
   startDate: string;
   endDate: Date;
   totalDays: number;
+  attempts: ChallengeAttempt[];
+  currentAttempt: number;
+  missedDay: { missed: boolean; dayNumber: number };
   onUpdateTitle: (title: string) => void;
   onUpdateStartDate: (date: string) => void;
   onUpdateTotalDays: (days: number) => void;
+  onResetChallenge: () => void;
 }
 
-export const CoverPage = ({
+export const CoverPage = forwardRef<HTMLDivElement, CoverPageProps>(({
   title,
   startDate,
   endDate,
   totalDays,
+  attempts,
+  currentAttempt,
+  missedDay,
   onUpdateTitle,
   onUpdateStartDate,
   onUpdateTotalDays,
-}: CoverPageProps) => {
+  onResetChallenge,
+}, ref) => {
   const [isEditingTitle, setIsEditingTitle] = useState(false);
   const [titleText, setTitleText] = useState(title);
   const [isEditingDays, setIsEditingDays] = useState(false);
@@ -42,12 +52,32 @@ export const CoverPage = ({
   };
 
   return (
-    <div className="notebook-page page-curl min-h-[600px] rounded-sm overflow-hidden animate-fade-in flex flex-col items-center justify-center relative">
+    <div 
+      ref={ref}
+      className="notebook-page page-curl min-h-[600px] rounded-sm overflow-hidden animate-fade-in flex flex-col items-center justify-center relative"
+    >
       {/* Decorative elements */}
       <div className="absolute top-8 left-8 w-16 h-16 border-4 border-primary/20 rounded-full" />
       <div className="absolute bottom-8 right-8 w-20 h-20 border-4 border-primary/20 rounded-full" />
       <div className="absolute top-1/4 right-12 w-8 h-8 bg-primary/10 rotate-45" />
       <div className="absolute bottom-1/4 left-12 w-8 h-8 bg-primary/10 rotate-45" />
+
+      {/* Reset Warning */}
+      {missedDay.missed && (
+        <div className="absolute top-4 left-4 right-4 p-4 bg-destructive/10 border border-destructive/30 rounded-lg z-20">
+          <p className="font-typewriter text-sm text-destructive mb-2">
+            ⚠️ You missed Day {missedDay.dayNumber}! Your challenge needs to restart.
+          </p>
+          <button
+            onClick={onResetChallenge}
+            className="flex items-center gap-2 px-4 py-2 bg-destructive text-destructive-foreground rounded-lg 
+                       font-typewriter text-sm hover:bg-destructive/90"
+          >
+            <RefreshCw size={16} />
+            Start New Attempt
+          </button>
+        </div>
+      )}
 
       {/* Main Content */}
       <div className="text-center z-10 px-8">
@@ -124,16 +154,23 @@ export const CoverPage = ({
           </p>
         </div>
 
+        {/* Attempt History */}
+        {attempts.length > 0 && (
+          <div className="mt-6">
+            <AttemptHistory attempts={attempts} currentAttempt={currentAttempt} />
+          </div>
+        )}
+
         {/* Instructions */}
         <div className="mt-12 p-6 border-2 border-dashed border-muted-foreground/30 rounded-lg">
           <p className="font-typewriter text-sm text-muted-foreground">
             ✦ Swipe right to set up your daily tasks ✦
           </p>
           <p className="font-typewriter text-sm text-muted-foreground mt-2">
-            ✦ Track your progress day by day ✦
+            ✦ Complete ALL tasks each day to keep your streak ✦
           </p>
           <p className="font-typewriter text-sm text-muted-foreground mt-2">
-            ✦ View your stats at the end ✦
+            ✦ Missing a day resets your challenge ✦
           </p>
         </div>
       </div>
@@ -146,4 +183,6 @@ export const CoverPage = ({
       </div>
     </div>
   );
-};
+});
+
+CoverPage.displayName = 'CoverPage';

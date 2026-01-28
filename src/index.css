@@ -68,6 +68,61 @@
     --sidebar-border: 35 20% 80%;
     --sidebar-ring: 25 50% 35%;
   }
+
+  .dark {
+    /* Dark mode - aged leather notebook */
+    --background: 25 20% 12%;
+    --foreground: 40 25% 85%;
+
+    /* Dark paper card */
+    --card: 25 15% 18%;
+    --card-foreground: 40 25% 85%;
+
+    --popover: 25 15% 18%;
+    --popover-foreground: 40 25% 85%;
+
+    /* Warm amber primary */
+    --primary: 35 60% 55%;
+    --primary-foreground: 25 20% 12%;
+
+    /* Dark secondary */
+    --secondary: 25 12% 22%;
+    --secondary-foreground: 40 25% 85%;
+
+    /* Muted for dark */
+    --muted: 25 10% 28%;
+    --muted-foreground: 35 15% 55%;
+
+    /* Accent - warm orange */
+    --accent: 25 70% 50%;
+    --accent-foreground: 25 20% 12%;
+
+    --destructive: 0 55% 45%;
+    --destructive-foreground: 0 0% 100%;
+
+    /* Dark line colors */
+    --border: 25 15% 30%;
+    --input: 25 15% 25%;
+    --ring: 35 60% 55%;
+
+    /* Notebook specific - dark */
+    --paper: 25 15% 16%;
+    --paper-line: 25 10% 25%;
+    --paper-margin: 0 40% 35%;
+    --ink: 40 20% 75%;
+    --pencil: 35 15% 60%;
+    --checkbox-border: 35 40% 45%;
+    --checkbox-checked: 35 60% 55%;
+
+    --sidebar-background: 25 15% 14%;
+    --sidebar-foreground: 40 25% 85%;
+    --sidebar-primary: 35 60% 55%;
+    --sidebar-primary-foreground: 25 20% 12%;
+    --sidebar-accent: 25 12% 22%;
+    --sidebar-accent-foreground: 40 25% 85%;
+    --sidebar-border: 25 15% 25%;
+    --sidebar-ring: 35 60% 55%;
+  }
 }
 
 @layer base {
@@ -141,8 +196,8 @@
     background: linear-gradient(
       135deg,
       transparent 50%,
-      hsl(40 25% 88%) 50%,
-      hsl(40 20% 85%) 100%
+      hsl(var(--secondary)) 50%,
+      hsl(var(--muted)) 100%
     );
     box-shadow: -2px -2px 5px hsl(25 30% 30% / 0.1);
   }

@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react';
-import { NotebookData, Section, Task, SectionLayout, PageInfo, PageType } from '@/types/notebook';
+import { NotebookData, Section, Task, SectionLayout, PageInfo, ChallengeAttempt } from '@/types/notebook';
 
 const STORAGE_KEY = 'daily-routine-notebook';
 
@@ -16,6 +16,11 @@ const getDefaultData = (): NotebookData => ({
   totalDays: 30,
   startDate: new Date().toISOString().split('T')[0],
   layouts: {},
+  currentAttempt: 0,
+  attempts: [],
+  reminderTime: '20:00',
+  reminderEnabled: false,
+  theme: 'light',
 });
 
 export const useNotebook = () => {
@@ -32,9 +37,11 @@ export const useNotebook = () => {
           }));
         }
         // Migration: add title if missing
-        if (!parsed.title) {
-          parsed.title = 'My Daily Challenge';
-        }
+        if (!parsed.title) parsed.title = 'My Daily Challenge';
+        // Migration: add attempts if missing
+        if (parsed.currentAttempt === undefined) parsed.currentAttempt = 0;
+        if (!parsed.attempts) parsed.attempts = [];
+        if (!parsed.theme) parsed.theme = 'light';
         return parsed;
       } catch {
         return getDefaultData();
@@ -43,10 +50,7 @@ export const useNotebook = () => {
     return getDefaultData();
   });
 
-  // Page navigation: 0 = cover, 1 = template, 2 to totalDays+1 = days, totalDays+2 = report
   const [currentPageIndex, setCurrentPageIndex] = useState(0);
-
-  // Calculate total pages: cover(1) + template(1) + days(totalDays) + report(1)
   const totalPages = data.totalDays + 3;
 
   const getPageInfo = useCallback((pageIndex: number): PageInfo => {
@@ -120,11 +124,20 @@ export const useNotebook = () => {
     }));
   }, []);
 
-  const addTask = useCallback((sectionId: string, text: string) => {
+  const addTask = useCallback((
+    sectionId: string,
+    text: string,
+    hasCounter?: boolean,
+    counterStart?: number,
+    counterIncrement?: number
+  ) => {
     const newTask: Task = {
       id: crypto.randomUUID(),
       text,
       completed: {},
+      hasCounter: hasCounter || false,
+      counterStart: counterStart || 0,
+      counterIncrement: counterIncrement || 0,
     };
     setData(prev => ({
       ...prev,
@@ -189,9 +202,8 @@ export const useNotebook = () => {
 
   const setTotalDays = useCallback((days: number) => {
     setData(prev => ({ ...prev, totalDays: days }));
-    // Adjust current page if needed
     if (currentPageIndex > days + 2) {
-      setCurrentPageIndex(days + 2); // Go to report page
+      setCurrentPageIndex(days + 2);
     }
   }, [currentPageIndex]);
 
@@ -219,7 +231,105 @@ export const useNotebook = () => {
     goToPage(currentPageIndex - 1);
   }, [currentPageIndex, goToPage]);
 
-  // Analytics calculations
+  // Reminder settings
+  const setReminderEnabled = useCallback((enabled: boolean) => {
+    setData(prev => ({ ...prev, reminderEnabled: enabled }));
+  }, []);
+
+  const setReminderTime = useCallback((time: string) => {
+    setData(prev => ({ ...prev, reminderTime: time }));
+  }, []);
+
+  // Check if current day has incomplete tasks (for reset logic)
+  const checkDayCompletion = useCallback((dayNumber: number): boolean => {
+    const totalTasks = data.sections.reduce((sum, s) => sum + s.tasks.length, 0);
+    if (totalTasks === 0) return true;
+    
+    let completed = 0;
+    data.sections.forEach(s => {
+      s.tasks.forEach(t => {
+        if (t.completed[dayNumber]) completed++;
+      });
+    });
+    return completed === totalTasks;
+  }, [data.sections]);
+
+  // Reset challenge (keep history, start new attempt)
+  const resetChallenge = useCallback(() => {
+    // Calculate how many days were completed in current attempt
+    let completedDays = 0;
+    for (let day = 1; day <= data.totalDays; day++) {
+      if (checkDayCompletion(day)) {
+        completedDays = day;
+      } else {
+        break;
+      }
+    }
+
+    // Create attempt record
+    const attempt: ChallengeAttempt = {
+      id: crypto.randomUUID(),
+      startedAt: data.startDate,
+      endedAt: new Date().toISOString(),
+      completedDays,
+      sections: JSON.parse(JSON.stringify(data.sections)),
+    };
+
+    // Clear all completion data
+    const clearedSections = data.sections.map(s => ({
+      ...s,
+      tasks: s.tasks.map(t => ({ ...t, completed: {} })),
+    }));
+
+    setData(prev => ({
+      ...prev,
+      sections: clearedSections,
+      attempts: [...prev.attempts, attempt],
+      currentAttempt: prev.attempts.length,
+      startDate: new Date().toISOString().split('T')[0],
+    }));
+
+    setCurrentPageIndex(2); // Go to Day 1
+  }, [data.sections, data.startDate, data.totalDays, checkDayCompletion]);
+
+  // Check for missed day and trigger reset prompt
+  const checkForMissedDay = useCallback((): { missed: boolean; dayNumber: number } => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(data.startDate);
+    start.setHours(0, 0, 0, 0);
+    
+    const daysPassed = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Check all previous days (not today)
+    for (let day = 1; day < Math.min(daysPassed + 1, data.totalDays + 1); day++) {
+      if (!checkDayCompletion(day)) {
+        return { missed: true, dayNumber: day };
+      }
+    }
+    return { missed: false, dayNumber: 0 };
+  }, [data.startDate, data.totalDays, checkDayCompletion]);
+
+  // Get task value for a specific day (for counter tasks)
+  const getTaskValueForDay = useCallback((task: Task, dayNumber: number): number => {
+    if (!task.hasCounter) return 0;
+    return (task.counterStart || 0) + (task.counterIncrement || 0) * (dayNumber - 1);
+  }, []);
+
+  // Has incomplete tasks today
+  const hasIncompleteTasksToday = useCallback((): boolean => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const start = new Date(data.startDate);
+    start.setHours(0, 0, 0, 0);
+    
+    const currentDay = Math.floor((today.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+    
+    if (currentDay < 1 || currentDay > data.totalDays) return false;
+    return !checkDayCompletion(currentDay);
+  }, [data.startDate, data.totalDays, checkDayCompletion]);
+
+  // Analytics
   const getAnalytics = useCallback(() => {
     const totalTasks = data.sections.reduce((sum, s) => sum + s.tasks.length, 0);
     const dailyCompletion: { day: number; completed: number; total: number; percentage: number }[] = [];
@@ -239,10 +349,9 @@ export const useNotebook = () => {
       });
     }
 
-    // Section breakdown
     const sectionBreakdown = data.sections.map(s => {
       let totalCompleted = 0;
-      let totalPossible = s.tasks.length * data.totalDays;
+      const totalPossible = s.tasks.length * data.totalDays;
       s.tasks.forEach(t => {
         Object.values(t.completed).forEach(c => {
           if (c) totalCompleted++;
@@ -256,7 +365,6 @@ export const useNotebook = () => {
       };
     });
 
-    // Streak calculation
     let currentStreak = 0;
     let longestStreak = 0;
     let tempStreak = 0;
@@ -274,7 +382,6 @@ export const useNotebook = () => {
       }
     }
 
-    // Calculate current streak from most recent day backwards
     for (let day = data.totalDays; day >= 1; day--) {
       const dayCompletion = dailyCompletion.find(d => d.day === day);
       if (dayCompletion && dayCompletion.percentage === 100) {
@@ -323,5 +430,12 @@ export const useNotebook = () => {
     prevPage,
     getPageInfo,
     getAnalytics,
+    setReminderEnabled,
+    setReminderTime,
+    checkDayCompletion,
+    resetChallenge,
+    checkForMissedDay,
+    getTaskValueForDay,
+    hasIncompleteTasksToday,
   };
 };
